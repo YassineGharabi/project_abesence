@@ -25,3 +25,9 @@ urlpatterns = [
     path('reports/', include('reports.urls')),
     path('', include('accounts.urls')), # Root URL goes to accounts for now (login/dashboard)
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

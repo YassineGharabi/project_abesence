@@ -3,7 +3,9 @@ from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required, user_passes_test
 import csv
 from reportlab.pdfgen import canvas
-from attendance.models import AttendanceRecord
+from attendance.models import AbsencePresence
+# Alias for compatibility
+AttendanceRecord = AbsencePresence
 
 def is_admin(user):
     return user.role == 'admin' or user.is_superuser
@@ -21,17 +23,17 @@ def export_attendance_csv(request):
     writer.writerow(['Student', 'Course', 'Date', 'Status', 'Timestamp'])
 
     if request.user.role == 'teacher':
-        records = AttendanceRecord.objects.filter(session__course__teacher=request.user)
+        records = AbsencePresence.objects.filter(session__classmodule__teacher__user=request.user)
     else:
         # Admin gets everything
-        records = AttendanceRecord.objects.all()
+        records = AbsencePresence.objects.all()
 
-    records = records.select_related('student', 'session', 'session__course')
+    records = records.select_related('student__user', 'session__classmodule__module', 'session__classmodule__class_obj')
     
     for record in records:
         writer.writerow([
-            record.student.username,
-            record.session.course.code,
+            record.student.user.username,
+            f"{record.session.classmodule.class_obj.name} - {record.session.classmodule.module.name}",
             record.session.date,
             record.status,
             record.timestamp
@@ -59,30 +61,30 @@ def export_attendance_pdf(request):
     p.setFont("Helvetica", 10)
     
     if request.user.role == 'teacher':
-        records = AttendanceRecord.objects.filter(session__course__teacher=request.user)
+        records = AbsencePresence.objects.filter(session__classmodule__teacher__user=request.user)
     else:
-        records = AttendanceRecord.objects.all()
+        records = AbsencePresence.objects.all()
 
-    records = records.select_related('student', 'session', 'session__course').order_by('-timestamp')[:100] # Limit for demo
+    records = records.select_related('student__user', 'session__classmodule__module', 'session__classmodule__class_obj').order_by('-timestamp')[:100] 
     
     # Header
     p.drawString(50, y, "Student")
-    p.drawString(200, y, "Course")
-    p.drawString(300, y, "Date")
-    p.drawString(400, y, "Status")
+    p.drawString(200, y, "Module/Class")
+    p.drawString(350, y, "Date")
+    p.drawString(450, y, "Status")
     y -= 20
-    p.line(50, y+15, 500, y+15)
+    p.line(50, y+15, 550, y+15)
     
     for record in records:
-        text_student = f"{record.student.username}"
-        text_course = f"{record.session.course.code}"
+        text_student = f"{record.student.user.username}"
+        text_info = f"{record.session.classmodule.class_obj.name} - {record.session.classmodule.module.name}"
         text_date = f"{record.session.date}"
         text_status = f"{record.status}"
         
         p.drawString(50, y, text_student)
-        p.drawString(200, y, text_course)
-        p.drawString(300, y, text_date)
-        p.drawString(400, y, text_status)
+        p.drawString(200, y, text_info)
+        p.drawString(350, y, text_date)
+        p.drawString(450, y, text_status)
         
         y -= 20
         if y < 50:

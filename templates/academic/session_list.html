@@ -55,8 +55,8 @@
                 {% for session in page_obj %}
                 <tr>
                     <td class="ps-3">
-                        <div class="fw-bold">{{ session.course.code }}</div>
-                        <div class="small text-muted">{{ session.course.name }}</div>
+                        <div class="fw-bold">{{ session.classmodule.class_obj.name }}</div>
+                        <div class="small text-muted">{{ session.classmodule.module.name }}</div>
                     </td>
                     <td>{{ session.date }}</td>
                     <td><span class="badge bg-light text-dark border">{{ session.start_time }} - {{ session.end_time

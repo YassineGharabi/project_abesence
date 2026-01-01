@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from attendance.models import AttendanceRecord
-from academic.models import Course, Session
+from attendance.models import AbsencePresence, Seance, Module, Student, Teacher
+# Aliases
+AttendanceRecord = AbsencePresence
+Session = Seance
 from django.db.models import Count
 
 @login_required
@@ -17,28 +19,36 @@ def dashboard(request):
 
 @login_required
 def student_dashboard(request):
-    # Get courses the student has attended at least once
-    records = AttendanceRecord.objects.filter(student=request.user)
-    course_ids = records.values_list('session__course', flat=True).distinct()
+    if request.user.role != 'student':
+        return redirect('dashboard')
+        
+    try:
+        student_obj = Student.objects.get(user=request.user)
+    except Student.DoesNotExist:
+        return render(request, 'dashboard_student.html', {'chart_labels': [], 'chart_data': [], 'recent_records': []})
+
+    # Get modules the student has attended at least once
+    records = AttendanceRecord.objects.filter(student=student_obj)
+    module_ids = records.values_list('session__classmodule__module', flat=True).distinct()
     
-    courses_data = [] # Names
+    modules_data = [] # Names
     attendance_data = [] # Percentages
     
-    for cid in course_ids:
-        course = Course.objects.get(pk=cid)
-        total_sessions = Session.objects.filter(course=course).count()
-        my_attendance = records.filter(session__course=course).count()
+    for mid in module_ids:
+        module = Module.objects.get(pk=mid)
+        total_sessions = Session.objects.filter(classmodule__module=module, classmodule__class_obj=student_obj.class_obj).count()
+        my_attendance = records.filter(session__classmodule__module=module).count()
         
         if total_sessions > 0:
             percentage = (my_attendance / total_sessions) * 100
         else:
             percentage = 0
             
-        courses_data.append(course.name)
+        modules_data.append(module.name)
         attendance_data.append(round(percentage, 1))
 
     context = {
-        'chart_labels': courses_data,
+        'chart_labels': modules_data,
         'chart_data': attendance_data,
         'recent_records': records.order_by('-timestamp')[:5]
     }
@@ -46,20 +56,26 @@ def student_dashboard(request):
 
 @login_required
 def teacher_dashboard(request):
-    courses = Course.objects.filter(teacher=request.user)
+    if request.user.role != 'teacher':
+        return redirect('dashboard')
+        
+    teacher_obj, created = Teacher.objects.get_or_create(user=request.user)
+
+    from attendance.models import ClassModule
+    class_modules = ClassModule.objects.filter(teacher=teacher_obj).select_related('class_obj', 'module')
     
-    course_names = []
+    labels = []
     total_attendances = []
     
-    for course in courses:
-        # Total check-ins for this course across all sessions
-        count = AttendanceRecord.objects.filter(session__course=course).count()
-        course_names.append(course.code)
+    for cm in class_modules:
+        # Total check-ins for this class+module across all sessions
+        count = AttendanceRecord.objects.filter(session__classmodule=cm).count()
+        labels.append(f"{cm.class_obj.name} - {cm.module.name}")
         total_attendances.append(count)
         
     context = {
-        'courses': courses,
-        'chart_labels': course_names,
+        'courses': class_modules,
+        'chart_labels': labels,
         'chart_data': total_attendances,
         'total_checkins': sum(total_attendances)
     }

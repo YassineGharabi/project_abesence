@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container">
-    <h2>Attendance for {{ session.course.name }}</h2>
+    <h2>Attendance for {{ session.classmodule.module.name }}</h2>
     <p class="lead">Date: {{ session.date }} | Time: {{ session.start_time }}</p>
 
     <div class="card">
@@ -26,8 +26,8 @@
                 <tbody>
                     {% for record in attendances %}
                     <tr>
-                        <td>{{ record.student.get_full_name|default:record.student.username }}</td>
-                        <td>{{ record.student.student_id|default:"-" }}</td>
+                        <td>{{ record.student.user.get_full_name|default:record.student.user.username }}</td>
+                        <td>{{ record.student.user.student_id|default:"-" }}</td>
                         <td>{{ record.timestamp|date:"H:i:s" }}</td>
                         <td><span class="badge bg-success">{{ record.status }}</span></td>
                     </tr>

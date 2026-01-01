@@ -82,13 +82,14 @@
         <div class="card glass-card border-0 h-100 shadow-sm border-top border-4 border-primary">
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between mb-3">
-                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">{{ course.code }}</span>
+                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2">{{ course.class_obj.name
+                        }}</span>
                     <i class="bi bi-journal-bookmark text-muted"></i>
                 </div>
-                <h5 class="fw-bold card-title">{{ course.name }}</h5>
-                <p class="text-muted small mb-4">{{ course.description|truncatechars:80 }}</p>
+                <h5 class="fw-bold card-title">{{ course.module.name }}</h5>
+                <p class="text-muted small mb-4">Assigned to: {{ course.class_obj.name }}</p>
                 <div class="d-flex justify-content-between align-items-center mt-auto">
-                    <a href="{% url 'session_list' %}?course_id={{ course.id }}"
+                    <a href="{% url 'session_list' %}?classmodule_id={{ course.id }}"
                         class="btn btn-sm btn-link p-0 text-decoration-none fw-bold">View Sessions <i
                             class="bi bi-chevron-right ms-1"></i></a>
                 </div>

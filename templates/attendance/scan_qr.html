@@ -4,17 +4,59 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6 text-center">
-        <h2 class="mb-4">Scan Class QR Code</h2>
-        <div class="card shadow">
-            <div class="card-body">
-                <div id="reader" style="width: 100%;"></div>
-                <div id="result" class="mt-3 text-success font-weight-bold"></div>
-                <p class="mt-3 text-muted">Please allow camera access when prompted.</p>
+    <div class="col-md-8 text-center">
+        <h2 class="fw-bold mb-4">Attendance Scanner</h2>
+
+        <div class="card glass-card border-0 shadow-lg overflow-hidden">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-qr-code-scan me-2"></i> Mark Attendance</h5>
+            </div>
+            <div class="card-body p-4">
+                <!-- Toggle Buttons -->
+                <div class="btn-group w-100 mb-4" role="group">
+                    <button type="button" class="btn btn-outline-primary active" id="btn-camera"
+                        onclick="switchMode('camera')">
+                        <i class="bi bi-camera me-2"></i> Use Camera
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" id="btn-file" onclick="switchMode('file')">
+                        <i class="bi bi-image me-2"></i> Scan Image File
+                    </button>
+                </div>
+
+                <!-- Camera Scanner Section -->
+                <div id="camera-section">
+                    <div id="reader" style="width: 100%; min-height: 300px; background: #eee; border-radius: 8px;">
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        Point your camera at the QR code shown by the teacher.
+                    </div>
+                </div>
+
+                <!-- File Scanner Section -->
+                <div id="file-section" class="d-none">
+                    <div class="upload-box p-5 border border-2 border-dashed rounded-3 bg-light text-center">
+                        <i class="bi bi-cloud-arrow-up h1 text-primary"></i>
+                        <h5 class="mt-3">Select QR Code Image</h5>
+                        <p class="text-muted small">JPG, PNG, or GIF</p>
+                        <input type="file" id="qr-input-file" accept="image/*" class="form-control mt-3">
+                    </div>
+                    <div id="file-error" class="alert alert-danger mt-3 d-none small"></div>
+                </div>
+
+                <!-- Loading/Result Info -->
+                <div id="status-info" class="mt-4 d-none">
+                    <div class="alert alert-info">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <span id="status-message">Processing...</span>
+                    </div>
+                </div>
             </div>
         </div>
+
         <div class="mt-4">
-            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-arrow-left me-2"></i> Back to Dashboard
+            </a>
         </div>
     </div>
 </div>
@@ -23,25 +65,134 @@
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <script>
-    function onScanSuccess(decodedText, decodedResult) {
-        // Handle the scanned code
-        console.log(`Code matched = ${decodedText}`, decodedResult);
-        document.getElementById('result').innerText = "Scanned! Redirecting...";
+    let html5QrCode;
+    const readerId = "reader";
+    let currentMode = 'camera';
 
-        // Redirect to the scanned URL
-        // If the QR code contains the full URL:
-        window.location.href = decodedText;
+    function switchMode(mode) {
+        currentMode = mode;
+        const camBtn = document.getElementById('btn-camera');
+        const fileBtn = document.getElementById('btn-file');
+        const camSec = document.getElementById('camera-section');
+        const fileSec = document.getElementById('file-section');
+        const fileErr = document.getElementById('file-error');
+
+        fileErr.classList.add('d-none');
+
+        if (mode === 'camera') {
+            camBtn.classList.add('active');
+            fileBtn.classList.remove('active');
+            camSec.classList.remove('d-none');
+            fileSec.classList.add('d-none');
+            startCamera();
+        } else {
+            camBtn.classList.remove('active');
+            fileBtn.classList.add('active');
+            camSec.classList.add('d-none');
+            fileSec.classList.remove('d-none');
+            stopCamera();
+        }
     }
 
-    function onScanFailure(error) {
-        // handle scan failure, usually better to ignore and keep scanning.
-        // console.warn(`Code scan error = ${error}`);
+    function startCamera() {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode(readerId);
+        }
+
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            onScanSuccess
+        ).catch(err => {
+            console.error("Camera start error:", err);
+            // If environment camera fails, try any available
+            html5QrCode.start({ facingMode: "user" }, config, onScanSuccess);
+        });
     }
 
-    let html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false);
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    function stopCamera() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                console.log("Camera stopped");
+            }).catch(err => console.error("Stop error:", err));
+        }
+    }
+
+    function onScanSuccess(decodedText) {
+        console.log(`Scanned Result: ${decodedText}`);
+        showStatus("Scanned! Redirecting...");
+
+        if (decodedText.includes('/attendance/mark/')) {
+            window.location.href = decodedText;
+        } else {
+            handleScanError("Invalid QR code for this system.");
+        }
+    }
+
+    function handleScanError(msg) {
+        if (currentMode === 'file') {
+            const fileErr = document.getElementById('file-error');
+            fileErr.innerText = msg;
+            fileErr.classList.remove('d-none');
+        } else {
+            alert(msg);
+        }
+    }
+
+    function showStatus(msg) {
+        document.getElementById('status-info').classList.remove('d-none');
+        document.getElementById('status-message').innerText = msg;
+    }
+
+    // File Input Listener
+    document.getElementById('qr-input-file').addEventListener('change', e => {
+        if (e.target.files.length === 0) return;
+
+        const imageFile = e.target.files[0];
+        const html5QrCodeFile = new Html5Qrcode("reader"); // Hidden reader or same ID
+
+        document.getElementById('file-error').classList.add('d-none');
+        showStatus("Decoding image...");
+
+        html5QrCodeFile.scanFile(imageFile, true)
+            .then(decodedText => {
+                onScanSuccess(decodedText);
+            })
+            .catch(err => {
+                console.error("File scan error:", err);
+                document.getElementById('status-info').classList.add('d-none');
+                handleScanError("Could not find a valid QR code in this image. Please try another one.");
+            });
+    });
+
+    // Initialize with camera
+    window.addEventListener('DOMContentLoaded', () => {
+        startCamera();
+    });
 </script>
+
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+    }
+
+    .upload-box {
+        border-style: dashed !important;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .upload-box:hover {
+        background-color: #f1f5f9 !important;
+        border-color: #0d6efd !important;
+    }
+
+    #reader video {
+        border-radius: 8px;
+        object-fit: cover !important;
+    }
+</style>
 {% endblock %}
